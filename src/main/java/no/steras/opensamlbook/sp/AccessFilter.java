@@ -42,32 +42,33 @@ import java.security.Security;
 public class AccessFilter implements Filter {
     private static Logger logger = LoggerFactory.getLogger(AccessFilter.class);
 
-    /** OpenSAML使用JCE来提供密码学的功能模块。由于某些
-     * JCE的实现并不覆盖所有OpenSAML要求的功能，所以推荐使用**Bouncy Castle**的JCE实现。
-     * 为了帮助用户来确认JCE的实现是否正确，可以使用如下函数：
-     * @param filterConfig 过滤器配置
+    /**
+     * OpenSAML uses JCE to provide cryptographic functional modules. Due to some
+     * JCE implementation does not cover all the features required by OpenSAML, so it is recommended to use ** Bouncy Castle ** JCE implementation.
+     * In order to help users to confirm JCE implementation is correct, you can use the following function:
+     * @param filterConfig Filter configuration
      * @throws ServletException
      */
     public void init(FilterConfig filterConfig) throws ServletException {
         JavaCryptoValidationInitializer javaCryptoValidationInitializer =
                 new JavaCryptoValidationInitializer();
         try {
-            //这个方法应该在OpenSAML初始化之前被调用，
-            //来确保当前的JCE环境可以符合要求：AES/CBC/ISO10126Padding
-            // 对于XML的加密，JCE需要支持ACE（128/256），并使用ISO10126Padding（填充位）
+            //This method should be called before OpenSAML is initialized,
+            //To ensure that the current JCE environment can meet the requirements: AES / CBC / ISO10126Padding
+            // For XML encryption, JCE needs to support ACE (128/256) and use ISO10126Padding
             javaCryptoValidationInitializer.init();
         } catch (InitializationException e) {
             e.printStackTrace();
         }
 
-        //打印当前已经被安装的所有JCE的provider
+        //Print all JCE providers that are currently installed
         for (Provider jceProvider : Security.getProviders()) {
             logger.info(jceProvider.getInfo());
         }
 
         try {
             logger.info("Initializing");
-            //正式初始化ＳＡＭＬ服务
+            //Formally initialize the SAML service
             InitializationService.initialize();
         } catch (InitializationException e) {
             throw new RuntimeException("Initialization failed");
@@ -78,26 +79,26 @@ public class AccessFilter implements Filter {
         HttpServletRequest httpServletRequest = (HttpServletRequest)request;
         HttpServletResponse httpServletResponse = (HttpServletResponse)response;
 
-        // 如果用户已经通过身份鉴别，则session中会有AUTHENTICATED_SESSION_ATTRIBUTE，
-        // 此时用户是已经被认证的，过滤器应该不对该操作做任何处理；
+        // If the user has passed identity authentication, the session will be AUTHENTICATED_SESSION_ATTRIBUTE,
+        // At this point the user is already certified, the filter should not do anything about the operation;
         if (httpServletRequest.getSession()
                 .getAttribute(SPConstants.AUTHENTICATED_SESSION_ATTRIBUTE) != null) {
             chain.doFilter(request, response);
-        } else { // 反之，则意味着需要开启鉴别流程：保留当前的目标URL，然后重定向到IDP。
+        } else { // On the other hand, it means that you need to turn on the authentication process: keep the current target URL, and then redirect to IDP.
             setGotoURLOnSession(httpServletRequest);
             redirectUserForAuthentication(httpServletResponse);
         }
     }
 
     /**
-     * 将本来要访问的目标路径保存到Session
+     * Will have to visit the target path to save the Session
      */
     private void setGotoURLOnSession(HttpServletRequest request) {
         request.getSession().setAttribute(SPConstants.GOTO_URL_SESSION_ATTRIBUTE, request.getRequestURL().toString());
     }
 
     /**
-     *  构建AuthnRequest对象
+     *  Build an AuthnRequest object
      * {@link AccessFilter#buildAuthnRequest()}
      */
     private void redirectUserForAuthentication(HttpServletResponse httpServletResponse) {
@@ -112,18 +113,18 @@ public class AccessFilter implements Filter {
 
         context.setMessage(authnRequest);
 
-        //关于传输对端实体的信息，对于IDP就是SP，对于SP就是IDP；
+        //Information about transmitting the peer entity is SP for IDP and IDP for SP.
         SAMLPeerEntityContext peerEntityContext =
                 context.getSubcontext(SAMLPeerEntityContext.class, true);
 
-        //端点信息；
+        //Endpoint information
         SAMLEndpointContext endpointContext =
                 peerEntityContext.getSubcontext(SAMLEndpointContext.class, true);
         endpointContext.setEndpoint(getIPDEndpoint());
 
-        //数据签名环境上线文
+        //Data Signing Environment on the line
         SignatureSigningParameters signatureSigningParameters = new SignatureSigningParameters();
-        //获得证书，其中包含公钥
+        //Obtain a certificate that contains the public key
         signatureSigningParameters.setSigningCredential(SPCredentials.getCredential());
         //ALGO_ID_SIGNATURE_RSA_SHA256
         signatureSigningParameters.setSignatureAlgorithm(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
@@ -132,8 +133,8 @@ public class AccessFilter implements Filter {
         context.getSubcontext(SecurityParametersContext.class, true)
                 .setSignatureSigningParameters(signatureSigningParameters);
 
-        // OpenSAML提供了HTTPRedirectDefalteEncoder
-        // 它将帮助我们来对于AuthnRequest进行序列化和签名
+        // OpenSAML provides HTTPRedirectDefalteEncoder
+        // It will help us to serialize and sign AuthnRequest
         HTTPRedirectDeflateEncoder encoder = new HTTPRedirectDeflateEncoder();
 
         encoder.setMessageContext(context);
@@ -150,8 +151,8 @@ public class AccessFilter implements Filter {
 
         logger.info("Redirecting to IDP");
         try {
-            //*encode*方法将会压缩消息，生成签名，添加结果到URL并从定向用户到Idp.
-            //先使用RFC1951作为默认方法压缩数据，在对压缩后的数据信息Base64编码
+            //*encode*The method will compress the message, generate the signature, add the result to the URL and from the targeting user to the Idp.
+            //First use RFC1951 as the default method to compress the data, encode the compressed data message Base64
             encoder.encode();
         } catch (MessageEncodingException e) {
             throw new RuntimeException(e);
@@ -160,22 +161,22 @@ public class AccessFilter implements Filter {
 
     private AuthnRequest buildAuthnRequest() {
         AuthnRequest authnRequest = OpenSAMLUtils.buildSAMLObject(AuthnRequest.class);
-        //请求时间：该对象创建的时间，以判断其时效性
+        //Request Time: The time the object was created to determine its timeliness
         authnRequest.setIssueInstant(new DateTime());
-        //目标URL：目标地址，IDP地址
+        //Destination URL: Destination Address, IDP Address
         authnRequest.setDestination(getIPDSSODestination());
-        //传输SAML断言所需要的绑定：也就是用何种协议使用Artifact来取回真正的认证信息，
+        //The binding required to transmit the SAML assertion: That is, what kind of protocol to use Artifact to retrieve the authentic authentication information,
         authnRequest.setProtocolBinding(SAMLConstants.SAML2_ARTIFACT_BINDING_URI);
-        //SP地址： 也就是SAML断言返回的地址
+        //SP Address: This is the address returned by SAML assertion
         authnRequest.setAssertionConsumerServiceURL(getAssertionConsumerEndpoint());
-        //请求的ID：为当前请求设置ID，一般为随机数
+        //Request ID: Set the ID for the current request, usually a random number
         authnRequest.setID(OpenSAMLUtils.generateSecureRandomId());
-        //Issuer： 发行人信息，也就是SP的ID，一般是SP的URL
+        //Issuer: The issuer's information, which is the SP's ID, is generally the SP's URL
         authnRequest.setIssuer(buildIssuer());
-        //NameID：IDP对于用户身份的标识；NameID policy是SP关于NameID是如何创建的说明
+        //NameID: IDP ID for the user's identity; NameID policy is SP's description of how NameID is created
         authnRequest.setNameIDPolicy(buildNameIdPolicy());
-        // 请求认证上下文（requested Authentication Context）:
-        // SP对于认证的要求，包含SP希望IDP如何验证用户，也就是IDP要依据什么来验证用户身份。
+        // Request Authentication Context:
+        // The SP's requirements for authentication include how the SP wants IDP to authenticate users, which is what IDP is based on to verify user identities.
         authnRequest.setRequestedAuthnContext(buildRequestedAuthnContext());
 
         return authnRequest;

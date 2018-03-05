@@ -130,7 +130,7 @@ public class ArtifactResolutionServlet extends HttpServlet {
     }
 
     /**
-     * 加密断言
+     * Encryption assertion
      */
     private EncryptedAssertion encryptAssertion(Assertion assertion) {
         DataEncryptionParameters encryptionParameters = new DataEncryptionParameters();
@@ -159,7 +159,7 @@ public class ArtifactResolutionServlet extends HttpServlet {
         assertion.setSignature(signature);
 
         try {
-            //noinspection ConstantConditions =》marshall 要求输入Nonnull且输出为Nonull；
+            //noinspection ConstantConditions = "marshall asks for Nonnull and output as Nonull;
             XMLObjectProviderRegistrySupport.getMarshallerFactory().getMarshaller(assertion).marshall(assertion);
         } catch (MarshallingException e) {
             throw new RuntimeException(e);

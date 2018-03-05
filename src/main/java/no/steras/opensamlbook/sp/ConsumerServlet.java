@@ -87,25 +87,25 @@ public class ConsumerServlet extends HttpServlet {
         Artifact artifact = buildArtifactFromRequest(req);
         logger.info("Artifact: " + artifact.getArtifact());
 
-        //开始创建ArtifactResolve;
+        //Start creating ArtifactResolve;
         ArtifactResolve artifactResolve = buildArtifactResolve(artifact);
         logger.info("Sending ArtifactResolve");
         logger.info("ArtifactResolve: ");
         OpenSAMLUtils.logSAMLObject(artifactResolve);
 
-        // 发送ArtifactResolve
-        // SOAP消息发送之后，会同步等待Response返回或者超时。
-        // 当Response返回时，SAML消息便可或得到：
+        // Send ArtifactResolve
+        // After the SOAP message is sent, it will synchronously wait for the Response to be returned or timed out.
+        // When Response returns, the SAML message can be either:
         ArtifactResponse artifactResponse = sendAndReceiveArtifactResolve(artifactResolve, resp);
         logger.info("ArtifactResponse received");
         logger.info("ArtifactResponse: ");
         OpenSAMLUtils.logSAMLObject(artifactResponse);
 
-        //验证目的地址和有效期；
+        //Verify the destination address and expiration date
         validateDestinationAndLifetime(artifactResponse, req);
 
         EncryptedAssertion encryptedAssertion = getEncryptedAssertion(artifactResponse);
-        //获得解密后的断言；
+        //Get the decrypted assertion;
         Assertion assertion = decryptAssertion(encryptedAssertion);
         verifyAssertionSignature(assertion);
         logger.info("Decrypted Assertion: ");
@@ -127,13 +127,13 @@ public class ConsumerServlet extends HttpServlet {
         SAMLMessageInfoContext messageInfoContext = context.getSubcontext(SAMLMessageInfoContext.class, true);
         messageInfoContext.setMessageIssueInstant(artifactResponse.getIssueInstant());
 
-        //生命周期验证，要求SAMLMessageInfoContext包含issue time;
+        //Lifecycle validation requires SAMLMessageInfoContext to contain issue time;
         MessageLifetimeSecurityHandler lifetimeSecurityHandler = new MessageLifetimeSecurityHandler();
         lifetimeSecurityHandler.setClockSkew(1000);
         lifetimeSecurityHandler.setMessageLifetime(2000);
         lifetimeSecurityHandler.setRequiredRule(true);
 
-        //验证消息目的地址，要求base message context包含SAML消息，必需的信息可以从中提取出来
+        //Verify the destination address of the message, require the base message context to contain the SAML message, and extract the necessary information from it
         ReceivedEndpointSecurityHandler receivedEndpointSecurityHandler = new ReceivedEndpointSecurityHandler();
         receivedEndpointSecurityHandler.setHttpServletRequest(request);
         List handlers = new ArrayList<MessageHandler>();
@@ -156,8 +156,8 @@ public class ConsumerServlet extends HttpServlet {
     }
 
     /**
-     * 解密断言
-     * @param encryptedAssertion 加密的断言
+     * Decrypt assertion
+     * @param encryptedAssertion Encrypted assertion
      */
     private Assertion decryptAssertion(EncryptedAssertion encryptedAssertion) {
         StaticKeyInfoCredentialResolver keyInfoCredentialResolver
@@ -233,7 +233,7 @@ public class ConsumerServlet extends HttpServlet {
     }
 
     /**
-     * 使用SOAP协议发送 ArtifactResolve
+     * Send ArtifactResolve using the SOAP protocol
      */
     private ArtifactResponse sendAndReceiveArtifactResolve(final ArtifactResolve artifactResolve, HttpServletResponse servletResponse) {
         try {
@@ -241,7 +241,7 @@ public class ConsumerServlet extends HttpServlet {
             MessageContext<ArtifactResolve> contextout = new MessageContext<ArtifactResolve>();
 
             contextout.setMessage(artifactResolve);
-            //加入数据签名以增强安全性
+            //Add data signatures to enhance security
             SignatureSigningParameters signatureSigningParameters = new SignatureSigningParameters();
             signatureSigningParameters.setSignatureAlgorithm(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
             signatureSigningParameters.setSigningCredential(SPCredentials.getCredential());
@@ -252,30 +252,30 @@ public class ConsumerServlet extends HttpServlet {
                 securityParametersContext.setSignatureSigningParameters(signatureSigningParameters);
             }
 
-            //创建InOutOperationContext来处理输入输出的信息
+            //Create an InOutOperationContext to process the input and output information
             InOutOperationContext<ArtifactResponse, ArtifactResolve> context = new ProfileRequestContext<ArtifactResponse, ArtifactResolve>();
             context.setOutboundMessageContext(contextout);
 
 
-            //为了能发送SOAP消息，还需要设置SOAP Client。
-            // 这个Client将会调用消息的处理器，编码器以及解码等来传送消息
+            //In order to be able to send SOAP messages, you also need to set up the SOAP Client.
+            // The Client will call the message processor, encoder, and decode to send the message
             AbstractPipelineHttpSOAPClient<SAMLObject, SAMLObject> soapClient = new AbstractPipelineHttpSOAPClient<SAMLObject, SAMLObject>() {
                 @Nonnull
                 protected HttpClientMessagePipeline newPipeline() throws SOAPException {
-                    //创建输入输出用的编码器和解码器
+                    //Create encoders and decoders for input and output
                     HttpClientRequestSOAP11Encoder encoder = new HttpClientRequestSOAP11Encoder();
                     HttpClientResponseSOAP11Decoder decoder = new HttpClientResponseSOAP11Decoder();
-                    //创建管道
+                    //Create a pipeline
                     BasicHttpClientMessagePipeline pipeline = new BasicHttpClientMessagePipeline(
                             encoder,
                             decoder
                     );
-                    //为输出的内容签名
+                    //Sign the output
                     pipeline.setOutboundPayloadHandler(new SAMLOutboundProtocolMessageSigningHandler());
                     return pipeline;
                 }};
 
-            // HTTP帮助SOAPClient编码和解码
+            // HTTP Help SOAPClient encoding and decoding
             HttpClientBuilder clientBuilder = new HttpClientBuilder();
 
             soapClient.setHttpClient(clientBuilder.buildClient());
@@ -296,7 +296,8 @@ public class ConsumerServlet extends HttpServlet {
 
     }
 
-    /**SAML消息中有敏感信息
+    /**
+     * Sensitive information in SAML messages
      */
     private Artifact buildArtifactFromRequest(final HttpServletRequest req) {
         Artifact artifact = OpenSAMLUtils.buildSAMLObject(Artifact.class);
@@ -306,7 +307,7 @@ public class ConsumerServlet extends HttpServlet {
 
     private ArtifactResolve buildArtifactResolve(final Artifact artifact) {
         ArtifactResolve artifactResolve = OpenSAMLUtils.buildSAMLObject(ArtifactResolve.class);
-        //Issuer：发送方的身份表示，同AuthnRequest中的issuer;
+        //Issuer：The identity of the sender, with issuer in AuthnRequest;
         Issuer issuer = OpenSAMLUtils.buildSAMLObject(Issuer.class);
         issuer.setValue(SPConstants.SP_ENTITY_ID);
         artifactResolve.setIssuer(issuer);
